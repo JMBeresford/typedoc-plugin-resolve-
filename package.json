@@ -1,0 +1,21 @@
+{
+  "name": "typedoc-plugin-resolve-external",
+  "version": "0.0.1",
+  "main": "dist/index.js",
+  "files": [
+    "dist/index.js"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.38",
+    "typedoc": "^0.25.0",
+    "typescript": "^5.2.2",
+    "vitest": "^0.34.6"
+  },
+  "peerDependencies": {
+    "typedoc": ">= 0.23.14 || 0.24.x || 0.25.x"
+  }
+}
