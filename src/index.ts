@@ -52,24 +52,56 @@ export function load(_app: Application) {
   });
 
   app.converter.addUnknownSymbolResolver((declaration, reflection) => {
-    const externalModulemap = app.options.getValue("externalModulemap");
+    const externalModulemap = app.options.getValue(
+      "externalModulemap",
+    ) as unknown as Record<string, string>;
 
-    const packageName = (reflection as any)?.type?.package;
     const name = declaration.symbolReference?.path
       ?.map((p) => p.path)
       .join(".");
 
-    if (!name || !packageName) return;
+    if (!name) {
+      log.warn(`[typedoc-plugin-resolve-external] No name found`);
 
-    let baseUrl = externalModulemap[packageName];
-    if (!baseUrl) return;
-    if (baseUrl.endsWith("/")) {
-      baseUrl = baseUrl.slice(0, -1);
+      return;
     }
 
     let result: string = "";
-    const type = (reflection as any)?.type as ReferenceType | undefined;
-    if (!type) return;
+    const refl = reflection as any;
+    let type = findTypeArgRecusive(refl.type, name);
+
+    if (!type) {
+      log.warn(
+        `[typedoc-plugin-resolve-external] No type found for ${name} under declaration ${reflection.name}`,
+      );
+
+      return;
+    }
+
+    const packageName = type.package;
+    if (!packageName) {
+      log.warn(
+        `[typedoc-plugin-resolve-external] No package found for ${name} under declaration ${reflection.name}`,
+      );
+
+      return;
+    }
+
+    let baseUrl: string = externalModulemap[packageName];
+    if (!baseUrl) {
+      log.warn(
+        `[typedoc-plugin-resolve-external] No baseUrl found for ${packageName}.`,
+      );
+      log.warn(
+        "Please add it to the externalModulemap option if you want to resolve this package with this plugin.",
+      );
+
+      return;
+    }
+
+    if (baseUrl.endsWith("/")) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
 
     const reflSymbol = type.symbolId;
     if (!reflSymbol) return;
@@ -149,4 +181,20 @@ function getNodeName(node: Node) {
     name = (node as any).name?.escapedText;
   }
   return name;
+}
+
+function findTypeArgRecusive(
+  type: ReferenceType,
+  name: string,
+): ReferenceType | undefined {
+  if (type.name === name) {
+    return type;
+  }
+
+  for (const t of type.typeArguments ?? []) {
+    const result = findTypeArgRecusive(t as ReferenceType, name);
+    if (result) return result;
+  }
+
+  return;
 }

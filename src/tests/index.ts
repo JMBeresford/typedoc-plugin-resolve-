@@ -18,3 +18,9 @@ export class DeviceClass {
     return this.device;
   }
 }
+
+export async function getTextureAsync(): Promise<GPUTexture> {
+  return new Promise<GPUTexture>((resolve) => {
+    resolve({} as GPUTexture);
+  });
+}

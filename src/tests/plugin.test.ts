@@ -154,4 +154,28 @@ describe("Resolves WebGPUs declared types", () => {
       "https://gpuweb.github.io/types/interfaces/GPUDevice",
     );
   });
+
+  test("Async Function Return", () => {
+    const refl = project.getChildByName("getTextureAsync");
+    expect(refl).toBeInstanceOf(DeclarationReflection);
+
+    const signatures = (refl as DeclarationReflection).signatures;
+    expect(signatures).toBeDefined();
+    expect(signatures!.length).toBe(1);
+    const signature = signatures![0];
+
+    // return type
+    const type = signature.type;
+    expect(type).toBeInstanceOf(ReferenceType);
+    const retType = type as ReferenceType;
+    expect(retType.typeArguments).toBeDefined();
+    expect(retType.typeArguments!.length).toBe(1);
+    const typeArg = retType.typeArguments![0];
+    expect(typeArg).toBeInstanceOf(ReferenceType);
+    const typeArgRef = typeArg as ReferenceType;
+
+    expect(typeArgRef.externalUrl).toBe(
+      "https://gpuweb.github.io/types/interfaces/GPUTexture",
+    );
+  });
 });
