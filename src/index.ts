@@ -11,15 +11,8 @@ import {
   isVariableDeclaration,
   Node,
   Program,
-  SyntaxKind,
 } from "typescript";
-import {
-  Application,
-  DeclarationReflection,
-  ParameterType,
-  ReferenceType,
-  ReflectionKind,
-} from "typedoc";
+import { Application, ParameterType, ReferenceType } from "typedoc";
 
 declare module "typedoc" {
   export interface TypeDocOptionMap {
@@ -44,7 +37,12 @@ const supportsObjectReturn = +version[1] > 23 || +version[2] >= 26;
 
 const packageToProgramMap = new Map<string, Program>();
 
-export function load(app: Application) {
+let app: Application;
+
+export function load(_app: Application) {
+  app = _app;
+  const log = app.logger;
+
   app.options.addDeclaration({
     name: "externalModulemap",
     help: "Map external module names to their documentation location",
@@ -70,10 +68,9 @@ export function load(app: Application) {
     }
 
     let result: string = "";
-    if (!(reflection instanceof DeclarationReflection)) return;
-    const refl = reflection as DeclarationReflection;
-    if (refl.type?.type !== "reference") return;
-    const type = refl.type as ReferenceType;
+    const type = (reflection as any)?.type as ReferenceType | undefined;
+    if (!type) return;
+
     const reflSymbol = type.symbolId;
     if (!reflSymbol) return;
     const source = reflSymbol.fileName;
@@ -147,5 +144,9 @@ function resolveNodeUri(node: Node, name: string) {
 }
 
 function getNodeName(node: Node) {
-  return (node as any).name?.text;
+  let name = (node as any).name?.text;
+  if (!name) {
+    name = (node as any).name?.escapedText;
+  }
+  return name;
 }
