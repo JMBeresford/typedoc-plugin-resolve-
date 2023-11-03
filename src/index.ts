@@ -52,91 +52,98 @@ export function load(_app: Application) {
   });
 
   app.converter.addUnknownSymbolResolver((declaration, reflection) => {
-    const externalModulemap = app.options.getValue(
-      "externalModulemap",
-    ) as unknown as Record<string, string>;
+    try {
+      const externalModulemap = app.options.getValue(
+        "externalModulemap",
+      ) as unknown as Record<string, string>;
 
-    const name = declaration.symbolReference?.path
-      ?.map((p) => p.path)
-      .join(".");
+      const name = declaration.symbolReference?.path
+        ?.map((p) => p.path)
+        .join(".");
 
-    if (!name) {
-      log.warn(`[typedoc-plugin-resolve-external] No name found`);
+      if (!name) {
+        log.warn(`[typedoc-plugin-resolve-external] No name found`);
 
-      return;
-    }
+        return;
+      }
 
-    let result: string = "";
-    const refl = reflection as any;
-    let type = findTypeArgRecusive(refl.type, name);
+      let result: string = "";
+      const refl = reflection as any;
+      let type = findTypeArgRecusive(refl.type, name);
 
-    if (!type) {
-      log.warn(
-        `[typedoc-plugin-resolve-external] No type found for ${name} under declaration ${reflection.name}`,
-      );
+      if (!type) {
+        log.warn(
+          `[typedoc-plugin-resolve-external] No type found for ${name} under declaration ${reflection.name}`,
+        );
 
-      return;
-    }
+        return;
+      }
 
-    const packageName = type.package;
-    if (!packageName) {
-      log.warn(
-        `[typedoc-plugin-resolve-external] No package found for ${name} under declaration ${reflection.name}`,
-      );
+      const packageName = type.package;
+      if (!packageName) {
+        log.warn(
+          `[typedoc-plugin-resolve-external] No package found for ${name} under declaration ${reflection.name}`,
+        );
 
-      return;
-    }
+        return;
+      }
 
-    let baseUrl: string = externalModulemap[packageName];
-    if (!baseUrl) {
-      log.warn(
-        `[typedoc-plugin-resolve-external] No baseUrl found for ${packageName}.`,
-      );
-      log.warn(
-        "Please add it to the externalModulemap option if you want to resolve this package with this plugin.",
-      );
+      let baseUrl: string = externalModulemap[packageName];
+      if (!baseUrl) {
+        log.warn(
+          `[typedoc-plugin-resolve-external] No baseUrl found for ${packageName}.`,
+        );
+        log.warn(
+          "Please add it to the externalModulemap option if you want to resolve this package with this plugin.",
+        );
 
-      return;
-    }
+        return;
+      }
 
-    if (baseUrl.endsWith("/")) {
-      baseUrl = baseUrl.slice(0, -1);
-    }
+      if (baseUrl.endsWith("/")) {
+        baseUrl = baseUrl.slice(0, -1);
+      }
 
-    const reflSymbol = type.symbolId;
-    if (!reflSymbol) return;
-    const source = reflSymbol.fileName;
+      const reflSymbol = type.symbolId;
+      if (!reflSymbol) return;
+      const source = reflSymbol.fileName;
 
-    let program = packageToProgramMap.get(packageName);
-    if (!program) {
-      program = createProgram({
-        rootNames: [source],
-        options: {},
+      let program = packageToProgramMap.get(packageName);
+      if (!program) {
+        program = createProgram({
+          rootNames: [source],
+          options: {},
+        });
+
+        packageToProgramMap.set(packageName, program);
+      }
+
+      const sourceFile = program.getSourceFile(source);
+      if (!sourceFile) return;
+
+      forEachChild(sourceFile, (node) => {
+        if (result.length > 0) return;
+
+        const uri = resolveNodeUri(node, name);
+        if (!uri) return;
+
+        result = `${baseUrl}/${uri}`;
       });
 
-      packageToProgramMap.set(packageName, program);
+      if (supportsObjectReturn) {
+        return {
+          target: result,
+          caption: name,
+        };
+      }
+
+      return result;
+    } catch (e) {
+      log.error(
+        `[typedoc-plugin-resolve-external] Encountered an error while resolving ${name}`,
+      );
+      log.error(`${e}`);
     }
-
-    const sourceFile = program.getSourceFile(source);
-    if (!sourceFile) return;
-
-    forEachChild(sourceFile, (node) => {
-      if (result.length > 0) return;
-
-      const uri = resolveNodeUri(node, name);
-      if (!uri) return;
-
-      result = `${baseUrl}/${uri}`;
-    });
-
-    if (supportsObjectReturn) {
-      return {
-        target: result,
-        caption: name,
-      };
-    }
-
-    return result;
   });
 }
 
@@ -184,9 +191,10 @@ function getNodeName(node: Node) {
 }
 
 function findTypeArgRecusive(
-  type: ReferenceType,
+  type: ReferenceType | undefined,
   name: string,
 ): ReferenceType | undefined {
+  if (!type) return;
   if (type.name === name) {
     return type;
   }
